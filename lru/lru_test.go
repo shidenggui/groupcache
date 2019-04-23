@@ -95,3 +95,13 @@ func TestEvict(t *testing.T) {
 		t.Fatalf("got %v in second evicted key; want %s", evictedKeys[1], "myKey1")
 	}
 }
+
+func BenchmarkLongScan(b *testing.B) {
+	var lru *Cache
+	for i :=0; i < b.N; i++ {
+		lru = New(5)
+		for j := 0; j < 10000; j++ {
+			lru.Add(j, j)
+		}
+	}
+}

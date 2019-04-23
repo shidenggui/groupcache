@@ -17,7 +17,9 @@ limitations under the License.
 // Package lru implements an LRU cache.
 package lru
 
-import "container/list"
+import (
+	"github.com/golang/groupcache/list"
+)
 
 // Cache is an LRU cache. It is not safe for concurrent access.
 type Cache struct {
@@ -63,11 +65,15 @@ func (c *Cache) Add(key Key, value interface{}) {
 		ee.Value.(*entry).value = value
 		return
 	}
-	ele := c.ll.PushFront(&entry{key, value})
-	c.cache[key] = ele
-	if c.MaxEntries != 0 && c.ll.Len() > c.MaxEntries {
-		c.RemoveOldest()
+	var ele *list.Element
+	if c.MaxEntries != 0 && c.ll.Len() >= c.MaxEntries {
+		var removed interface{}
+		ele, removed = c.ll.PushFrontByRotate(&entry{key, value})
+		c.removeValue(removed)
+	} else {
+		ele = c.ll.PushFront(&entry{key, value})
 	}
+	c.cache[key] = ele
 }
 
 // Get looks up a key's value from the cache.
@@ -106,6 +112,14 @@ func (c *Cache) RemoveOldest() {
 func (c *Cache) removeElement(e *list.Element) {
 	c.ll.Remove(e)
 	kv := e.Value.(*entry)
+	delete(c.cache, kv.key)
+	if c.OnEvicted != nil {
+		c.OnEvicted(kv.key, kv.value)
+	}
+}
+
+func (c *Cache) removeValue(v interface{}) {
+	kv := v.(*entry)
 	delete(c.cache, kv.key)
 	if c.OnEvicted != nil {
 		c.OnEvicted(kv.key, kv.value)
